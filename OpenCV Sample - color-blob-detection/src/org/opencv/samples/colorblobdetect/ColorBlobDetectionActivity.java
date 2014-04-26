@@ -231,14 +231,14 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
             Imgproc.drawContours(mRgba, contours, -1, CONTOUR_COLOR);
             //Ends     
             //Custom code starts
-            frame=mRgba.clone();	
-    		Imgproc.blur(frame, frame,blurSize); //smooth the original image using Gaussian kernel	
-    		Imgproc.cvtColor(frame, imgHSV, Imgproc.COLOR_BGR2HSV); //Change the color format from BGR to HSV
-    		Core.inRange(imgHSV, colorThreshold_1, colorThreshold_2, imgThresh);		
-    		Imgproc.blur(imgThresh, imgThresh,blurSize); 
-            imgMoments = Imgproc.moments(imgThresh); 
-            calculateMoments(imgMoments); //Also draws line to linesMat
-            Core.add(mRgba, linesMat, mRgba); //Adds linesMat and mRgba together
+//            frame=mRgba.clone();	
+//    		Imgproc.blur(frame, frame,blurSize); //smooth the original image using Gaussian kernel	
+//    		Imgproc.cvtColor(frame, imgHSV, Imgproc.COLOR_BGR2HSV); //Change the color format from BGR to HSV
+//    		Core.inRange(imgHSV, colorThreshold_1, colorThreshold_2, imgThresh);		
+//    		Imgproc.blur(imgThresh, imgThresh,blurSize); 
+//            imgMoments = Imgproc.moments(imgThresh); 
+//            calculateMoments(imgMoments); //Also draws line to linesMat
+//            Core.add(mRgba, linesMat, mRgba); //Adds linesMat and mRgba together
             //Custom code ends 
             //Color blob code continues
             Mat colorLabel = mRgba.submat(4, 68, 4, 68);
@@ -248,14 +248,14 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
         }
       
         
-//        Imgproc.blur(mRgba, mRgba, blurSize);
-//        Imgproc.cvtColor(mRgba, mRgba, Imgproc.COLOR_BGR2HSV);
-//        Core.inRange(mRgba, colorThreshold_1, colorThreshold_2, mRgba);
-//        Imgproc.blur(mRgba, mRgba, blurSize);
-//        imgMoments = Imgproc.moments(mRgba);
-//        calculateMoments(imgMoments);
-//        mRgba = inputFrame.rgba();
-//        Core.add(mRgba, linesMat, mRgba);
+        Imgproc.blur(mRgba, mRgba, blurSize);
+        Imgproc.cvtColor(mRgba, mRgba, Imgproc.COLOR_BGR2HSV);
+        Core.inRange(mRgba, colorThreshold_1, colorThreshold_2, mRgba);
+        Imgproc.blur(mRgba, mRgba, blurSize);
+        imgMoments = Imgproc.moments(mRgba);
+        calculateMoments(imgMoments);
+        mRgba = inputFrame.rgba();
+        Core.add(mRgba, linesMat, mRgba);
         
         return mRgba;
     }
