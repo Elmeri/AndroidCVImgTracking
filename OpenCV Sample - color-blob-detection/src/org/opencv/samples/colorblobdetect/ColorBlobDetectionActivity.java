@@ -46,13 +46,23 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
     private double 				 lastX = -1;
     private double				 lastY = -1;
     private Mat 				 linesMat;
+    private Mat					 linesResetMap; //turha
     private Size				 blurSize;
 	private Mat 				 imgHSV;
 	private Mat 				 imgThresh;
     private Point 				 newPoint; 
     private Point 				 lastPoint;
     private Scalar				 lineScalar;
-    
+    private Scalar				 lineResetScalar; //turha
+    private int 				 lineCounter;
+    private double 				 moment01;
+    private double 				 moment10;
+    private double 				 area;
+    private double[]			 tempPos1= {0, 0};
+    private double[]			 tempPos2= {0, 0};
+    private double 				 posX;
+    private double 				 posY;
+    private Moments 			 imgMoments;          
     
     // set scalar
     // draw the line    
@@ -123,14 +133,15 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
     public void onCameraViewStarted(int width, int height) {
         mRgba = new Mat(height, width, CvType.CV_8UC4);
         linesMat = new Mat(height, width, CvType.CV_8UC4);
+        linesResetMap = new Mat(height, width, CvType.CV_8UC4);
         mDetector = new ColorBlobDetector();
         mSpectrum = new Mat();
         mBlobColorRgba = new Scalar(255);
         mBlobColorHsv = new Scalar(255);
         SPECTRUM_SIZE = new Size(200, 64);
         CONTOUR_COLOR = new Scalar(255,0,0,255);
-        colorThreshold_1 = new Scalar(170,160,60);
-        colorThreshold_2 = new Scalar(180,256,256);
+        colorThreshold_1 = new Scalar(120,120,50);
+        colorThreshold_2 = new Scalar(180,2556,256);
         blurSize = new Size(3,3); //Used for gaussian blur
         imgHSV = new Mat(); //Create new HSV matrix
         imgThresh = new Mat(); //ImgThreshold matrix for detecting the objects
@@ -138,7 +149,17 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
         lastPoint = new Point();
         double[] temp2 = {0,0,255};
         lineScalar = new Scalar(temp2);
+        double[] temp3 = {0,0,0};
+        lineResetScalar = new Scalar(temp3);
+        lineCounter = 0;
         
+    	moment01 = 0;
+        moment10 = 0;
+        area = 0;
+//        tempPos1= {0, 0};
+//        tempPos2= {0, 0};
+        posX = 0;
+        posY = 0;
         
     }
 
@@ -215,7 +236,7 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
     		Imgproc.cvtColor(frame, imgHSV, Imgproc.COLOR_BGR2HSV); //Change the color format from BGR to HSV
     		Core.inRange(imgHSV, colorThreshold_1, colorThreshold_2, imgThresh);		
     		Imgproc.blur(imgThresh, imgThresh,blurSize); 
-            Moments imgMoments = Imgproc.moments(imgThresh); 
+            imgMoments = Imgproc.moments(imgThresh); 
             calculateMoments(imgMoments); //Also draws line to linesMat
             Core.add(mRgba, linesMat, mRgba); //Adds linesMat and mRgba together
             //Custom code ends 
@@ -225,8 +246,17 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
             Mat spectrumLabel = mRgba.submat(4, 4 + mSpectrum.rows(), 70, 70 + mSpectrum.cols());
             mSpectrum.copyTo(spectrumLabel);
         }
-
-
+      
+        
+//        Imgproc.blur(mRgba, mRgba, blurSize);
+//        Imgproc.cvtColor(mRgba, mRgba, Imgproc.COLOR_BGR2HSV);
+//        Core.inRange(mRgba, colorThreshold_1, colorThreshold_2, mRgba);
+//        Imgproc.blur(mRgba, mRgba, blurSize);
+//        imgMoments = Imgproc.moments(mRgba);
+//        calculateMoments(imgMoments);
+//        mRgba = inputFrame.rgba();
+//        Core.add(mRgba, linesMat, mRgba);
+        
         return mRgba;
     }
     
@@ -239,21 +269,23 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
      */
     private void calculateMoments(Moments imgMoments){
     	// Check http://stackoverflow.com/questions/8895749/cvgetspatialmoment-in-opencv-2-0
-    	double moment01 = imgMoments.get_m01();
-        double moment10 = imgMoments.get_m10();
-        double area = imgMoments.get_m00(); //Changed this from get_mu11(); 
+    	moment01 = imgMoments.get_m01();
+        moment10 = imgMoments.get_m10();
+        area = imgMoments.get_m00(); //Changed this from get_mu11(); 
         if(area>1000){
           // calculate the position of the ball
-          double posX = (moment10/area);
-          double posY = (moment01/area);
+          posX = (moment10/area);
+          posY = (moment01/area);
       		if(lastX>=0 && lastY>=0 && posX>=0 && posY>=0)
               {
                   // Draw a yellow line from the previous point to the current point
                   // set Points for drawing the line
-                  double[] temp= {posX, posY};
-                  newPoint.set(temp);
-                  double[] temp1 = {lastX, lastY};
-                  lastPoint.set(temp1);                  
+                  tempPos1[0] = posX;
+                  tempPos1[1] = posY;
+                  newPoint.set(tempPos1);
+                  tempPos2[0] = lastX;
+                  tempPos2[1] = lastY;
+                  lastPoint.set(tempPos2);                  
                   // draw the line                  
                   try{
                 	  Core.line(linesMat, newPoint, lastPoint, lineScalar, 4);
@@ -264,6 +296,12 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
       		lastX = posX;
       		lastY = posY;
       		Log.v(ALARM_SERVICE, String.valueOf(posX));
+      		lineCounter++;
+      		if(lineCounter > 15) {
+      			linesMat.setTo(lineResetScalar);
+      			lineCounter = 0;
+      		}
+      		
         }       
     }
 
