@@ -140,24 +140,26 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
         mBlobColorHsv = new Scalar(255);
         SPECTRUM_SIZE = new Size(200, 64);
         CONTOUR_COLOR = new Scalar(255,0,0,255);
+        //Color thresholds for defining the detection range
         colorThreshold_1 = new Scalar(120,120,50);
         colorThreshold_2 = new Scalar(180,2556,256);
         blurSize = new Size(3,3); //Used for gaussian blur
         imgHSV = new Mat(); //Create new HSV matrix
         imgThresh = new Mat(); //ImgThreshold matrix for detecting the objects
-        newPoint = new Point(); //Point for line drawing
-        lastPoint = new Point();
+        //Points defined for line drawing
+        newPoint = new Point(); 
+        lastPoint = new Point(); 
+        //Scalars defined for line drawing (blur)
         double[] temp2 = {0,0,255};
         lineScalar = new Scalar(temp2);
         double[] temp3 = {0,0,0};
         lineResetScalar = new Scalar(temp3);
-        lineCounter = 0;
-        
+        lineCounter = 0; //Counter that checks amount of lines drawn in linesMat matrix
+        //Variables for calculating the middle point
     	moment01 = 0;
         moment10 = 0;
         area = 0;
-//        tempPos1= {0, 0};
-//        tempPos2= {0, 0};
+        //Line positions
         posX = 0;
         posY = 0;
         
