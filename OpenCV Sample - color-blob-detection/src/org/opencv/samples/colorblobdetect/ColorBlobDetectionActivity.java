@@ -24,6 +24,8 @@ import org.opencv.imgproc.Moments;
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
@@ -32,6 +34,9 @@ import android.view.View.OnTouchListener;
 
 public class ColorBlobDetectionActivity extends Activity implements OnTouchListener, CvCameraViewListener2 {
     private static final String  TAG              = "OCVSample::Activity";
+    private static final int       VIEW_MODE_TRACK    		  = 0;
+    private static final int       VIEW_MODE_COLOR_DETECT     = 1;
+    private static final int	   VIEW_MODE_COLOR_HSV	  	  = 2;
 
     private boolean              mIsColorSelected = false;
     private Mat                  mRgba;
@@ -46,15 +51,17 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
     private double 				 lastX = -1;
     private double				 lastY = -1;
     private Mat 				 linesMat;
-    private Mat					 linesResetMap; //turha
+    private Mat					 linesResetMap; 
     private Size				 blurSize;
 	private Mat 				 imgHSV;
 	private Mat 				 imgThresh;
     private Point 				 newPoint; 
     private Point 				 lastPoint;
     private Scalar				 lineScalar;
-    private Scalar				 lineResetScalar; //turha
+    private Scalar				 lineResetScalar; 
     private int 				 lineCounter;
+    private int					 cols;
+    private int					 rows;
     private double 				 moment01;
     private double 				 moment10;
     private double 				 area;
@@ -62,12 +69,21 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
     private double[]			 tempPos2= {0, 0};
     private double 				 posX;
     private double 				 posY;
+    private double				 directionX;
+    private double				 directionY;
     private Moments 			 imgMoments;          
     
     // set scalar
     // draw the line    
     
-
+    
+    //Menu items
+    private MenuItem               mItemPreviewTrack;
+    private MenuItem               mItemPreviewColorDetect;
+    private MenuItem			   mItemPreviewColorHSV;
+    
+    private int                    mViewMode;
+   
     //Added variable
     private Mat 				 frame;
     
@@ -107,6 +123,15 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
 
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.color_blob_detection_activity_surface_view);
         mOpenCvCameraView.setCvCameraViewListener(this);
+    }
+    
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        Log.i(TAG, "called onCreateOptionsMenu");
+        mItemPreviewTrack = menu.add("Track");
+        mItemPreviewColorDetect = menu.add("Detect color");
+        mItemPreviewColorHSV = menu.add("Color HSV");
+        return true;
     }
 
     @Override
@@ -162,6 +187,10 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
         //Line positions
         posX = 0;
         posY = 0;
+        rows = 0;
+        cols = 0;
+        directionX = 0;
+        directionY = 0;
         
     }
 
@@ -170,52 +199,6 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
     }
 
     public boolean onTouch(View v, MotionEvent event) {
-        int cols = mRgba.cols();
-        int rows = mRgba.rows();
-
-        int xOffset = (mOpenCvCameraView.getWidth() - cols) / 2;
-        int yOffset = (mOpenCvCameraView.getHeight() - rows) / 2;
-
-        int x = (int)event.getX() - xOffset;
-        int y = (int)event.getY() - yOffset;
-
-        Log.i(TAG, "Touch image coordinates: (" + x + ", " + y + ")");
-
-        if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) return false;
-
-        Rect touchedRect = new Rect();
-
-        touchedRect.x = (x>4) ? x-4 : 0;
-        touchedRect.y = (y>4) ? y-4 : 0;
-
-        touchedRect.width = (x+4 < cols) ? x + 4 - touchedRect.x : cols - touchedRect.x;
-        touchedRect.height = (y+4 < rows) ? y + 4 - touchedRect.y : rows - touchedRect.y;
-
-        Mat touchedRegionRgba = mRgba.submat(touchedRect);
-
-        Mat touchedRegionHsv = new Mat();
-        Imgproc.cvtColor(touchedRegionRgba, touchedRegionHsv, Imgproc.COLOR_RGB2HSV_FULL);
-
-        // Calculate average color of touched region
-        mBlobColorHsv = Core.sumElems(touchedRegionHsv);
-        int pointCount = touchedRect.width*touchedRect.height;
-        for (int i = 0; i < mBlobColorHsv.val.length; i++)
-            mBlobColorHsv.val[i] /= pointCount;
-
-        mBlobColorRgba = converScalarHsv2Rgba(mBlobColorHsv);
-
-        Log.i(TAG, "Touched rgba color: (" + mBlobColorRgba.val[0] + ", " + mBlobColorRgba.val[1] +
-                ", " + mBlobColorRgba.val[2] + ", " + mBlobColorRgba.val[3] + ")");
-
-        mDetector.setHsvColor(mBlobColorHsv);
-
-        Imgproc.resize(mDetector.getSpectrum(), mSpectrum, SPECTRUM_SIZE);
-
-        mIsColorSelected = true;
-
-        touchedRegionRgba.release();
-        touchedRegionHsv.release();
-
         return false; // don't need subsequent touch events
     }
 
@@ -226,40 +209,58 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
         mRgba = inputFrame.rgba();
 
         if (mIsColorSelected) {   	
-        	//Normal Code
-            mDetector.process(mRgba);
-            List<MatOfPoint> contours = mDetector.getContours();
-            Log.e(TAG, "Contours count: " + contours.size());
-            Imgproc.drawContours(mRgba, contours, -1, CONTOUR_COLOR);
-            //Ends     
-            //Custom code starts
-//            frame=mRgba.clone();	
-//    		Imgproc.blur(frame, frame,blurSize); //smooth the original image using Gaussian kernel	
-//    		Imgproc.cvtColor(frame, imgHSV, Imgproc.COLOR_BGR2HSV); //Change the color format from BGR to HSV
-//    		Core.inRange(imgHSV, colorThreshold_1, colorThreshold_2, imgThresh);		
-//    		Imgproc.blur(imgThresh, imgThresh,blurSize); 
-//            imgMoments = Imgproc.moments(imgThresh); 
-//            calculateMoments(imgMoments); //Also draws line to linesMat
-//            Core.add(mRgba, linesMat, mRgba); //Adds linesMat and mRgba together
-            //Custom code ends 
-            //Color blob code continues
-            Mat colorLabel = mRgba.submat(4, 68, 4, 68);
-            colorLabel.setTo(mBlobColorRgba);
-            Mat spectrumLabel = mRgba.submat(4, 4 + mSpectrum.rows(), 70, 70 + mSpectrum.cols());
-            mSpectrum.copyTo(spectrumLabel);
+
         }
       
         
         Imgproc.blur(mRgba, mRgba, blurSize);
         Imgproc.cvtColor(mRgba, mRgba, Imgproc.COLOR_BGR2HSV);
-        Core.inRange(mRgba, colorThreshold_1, colorThreshold_2, mRgba);
-        Imgproc.blur(mRgba, mRgba, blurSize);
-        imgMoments = Imgproc.moments(mRgba);
-        calculateMoments(imgMoments);
-        mRgba = inputFrame.rgba();
-        Core.add(mRgba, linesMat, mRgba);
+        if(mViewMode != VIEW_MODE_COLOR_HSV){
+        	Core.inRange(mRgba, colorThreshold_1, colorThreshold_2, mRgba);
+            Imgproc.blur(mRgba, mRgba, blurSize);
+        }
+        if(mViewMode == VIEW_MODE_TRACK) {
+            imgMoments = Imgproc.moments(mRgba);
+            calculateMoments(imgMoments);
+            mRgba = inputFrame.rgba();
+            Core.add(mRgba, linesMat, mRgba);
+        }
+        
+        cols = mRgba.cols();
+        rows = mRgba.rows();
+
+        int xOffset = (mOpenCvCameraView.getWidth() - cols) / 2;
+        int yOffset = (mOpenCvCameraView.getHeight() - rows) / 2;
+
+        int x = (int) (posX - xOffset);
+        int y = (int) (posY - yOffset);
+
+        Log.i(TAG, "Object coordinates: (" + x + ", " + y + ")");
+        
+        directionX = (posX - ((double) cols/2)) / ((double) cols/2);   // value from 0 to 1
+        directionY = (posY - ((double) rows/2)) / ((double) rows/2);   // value from 0 to 1
+
+        String result1 = String.format("%.4f", directionX);
+        String result2 = String.format("%.4f", directionY);
+        
+        Log.i(TAG, "Dir x and y: (" + result1 + ", " + result2 + ")");
+        
+        //if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) return false;
         
         return mRgba;
+    }
+    
+    public boolean onOptionsItemSelected(MenuItem item) {
+        Log.i(TAG, "called onOptionsItemSelected; selected item: " + item);
+
+        if (item == mItemPreviewTrack) {
+            mViewMode = VIEW_MODE_TRACK;
+        } else if (item == mItemPreviewColorDetect) {
+            mViewMode = VIEW_MODE_COLOR_DETECT;
+        } else if (item == mItemPreviewColorHSV){
+        	mViewMode = VIEW_MODE_COLOR_HSV;
+        }
+        return true;
     }
     
 
@@ -297,7 +298,7 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
               }
       		lastX = posX;
       		lastY = posY;
-      		Log.v(ALARM_SERVICE, String.valueOf(posX));
+      		//Log.v(ALARM_SERVICE, String.valueOf(posX));
       		lineCounter++;
       		if(lineCounter > 15) {
       			linesMat.setTo(lineResetScalar);
@@ -307,11 +308,4 @@ public class ColorBlobDetectionActivity extends Activity implements OnTouchListe
         }       
     }
 
-    private Scalar converScalarHsv2Rgba(Scalar hsvColor) {
-        Mat pointMatRgba = new Mat();
-        Mat pointMatHsv = new Mat(1, 1, CvType.CV_8UC3, hsvColor);
-        Imgproc.cvtColor(pointMatHsv, pointMatRgba, Imgproc.COLOR_HSV2RGB_FULL, 4);
-
-        return new Scalar(pointMatRgba.get(0, 0));
-    }
 }
